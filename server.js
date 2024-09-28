@@ -8,9 +8,9 @@ const cors = require('cors'); // Import CORS middleware
 const path = require('path');
 const mongoose = require('mongoose');
 const app = express();
-const { searchById } = require('./database/getMangaInfo');
+const { searchById, autocompleteSearch } = require('./database/getMangaInfo');
 const getManga = require('./routes/get-manga/getManga');
-//const search = require('./routes/search/search');
+const searchRouter = require('./routes/search/search');
 
 // Connect to MongoDB
 //mongoose.connect(process.env.MONGODB_URI)
@@ -57,7 +57,7 @@ app.get('/', (req, res) => {
 
 // Use routes
 app.use('/data', getManga);
-//app.use('/search', search);
+app.use('/api/search', searchRouter);
 
 // Catch-all route for production
 if (process.env.NODE_ENV === 'production') {

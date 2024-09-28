@@ -1,27 +1,31 @@
 const express = require('express');
 const router = express.Router();
-const axios = require('axios');
-
+const axios = require('axios'); // Add this line to import axios
 const { searchById } = require('../../database/getMangaInfo');
-const {getLatestManga} = require('../../database/getRandomData');
-const {chapterImage} = require('../../database/getChapterImage');
+const { getLatestManga } = require('../../database/getRandomData');
+const { chapterImage } = require('../../database/getChapterImage');
 
 const getRandomManga = async () => {
     return await getRandomData();
 };
 
 const getMangaInfo = async (mangaId) => {
-    const manga = await searchById(mangaId);
-    if (manga) {
-        const mangaInfo = JSON.parse(JSON.stringify(manga));
-        if (mangaInfo.chapters) {
-            mangaInfo.chapters.forEach(chapter => {
-                delete chapter.image_urls;
-            });
+    try {
+        const manga = await searchById(mangaId);
+        if (manga) {
+            const mangaInfo = JSON.parse(JSON.stringify(manga));
+            if (mangaInfo.chapters) {
+                mangaInfo.chapters.forEach(chapter => {
+                    delete chapter.image_urls;
+                });
+            }
+            return mangaInfo;
         }
-        return mangaInfo;
+        return null;
+    } catch (error) {
+        console.error('Error in getMangaInfo:', error);
+        return null;
     }
-    return null;
 };
 
 const getChapterImages = async (mangaId, chapterId) => {
