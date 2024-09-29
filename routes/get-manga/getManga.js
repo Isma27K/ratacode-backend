@@ -43,10 +43,11 @@ const getChapterImages = async (mangaId, chapterId) => {
 
 router.get('/getManga', async (req, res) => {
     try {
-        const randomManga = await getLatestManga();
-        res.status(200).json(randomManga);
+        const latestManga = await getLatestManga();
+        res.status(200).json(latestManga);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Error in getManga route:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 });
 

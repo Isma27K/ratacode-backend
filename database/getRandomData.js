@@ -1,51 +1,45 @@
 require('dotenv').config(); // Add this at the top of the file
 
 const { MongoClient } = require('mongodb');
+const Manga = require('../models/Manga');
 
-async function getLatestManga(size = 30) {
-  const url = process.env.DB_URL; // MongoDB URL from environment variables
-  const dbName = process.env.DB_NAME; // Database name from environment variables
-  const client = new MongoClient(url, { useUnifiedTopology: true });
+let client, db;
 
-  try {
-    await client.connect();
-    // console.log("Connected to MongoDB");
-
-    const db = client.db(dbName);
-    const collection = db.collection(process.env.MANGA_COLLECTION); // Collection name from environment variables
-
-    // Updated aggregation pipeline to sort by latest_update after converting to date
-    const latestManga = await collection.aggregate([
-      {
-        $addFields: {
-          latest_update_date: {
-            $dateFromString: {
-              dateString: "$latest_update",
-              format: "%b %d,%Y %H:%M"
-            }
-          }
-        }
-      },
-      { $sort: { "latest_update_date": -1 } }, // Sort by the new date field
-      { $limit: size },
-      { 
-        $project: {
-          "chapters.image_urls": 0,
-          "chapters.url": 0,
-          latest_update_date: 0 // Exclude the temporary date field
-        }
-      }
-    ]).toArray();
-
-    return latestManga;
-
-  } catch (err) {
-    // console.error("Error fetching random data:", err);
-    throw err; // Re-throw the error for proper handling
-  } finally {
-    await client.close();
-    // console.log("Disconnected from MongoDB");
-  }
+async function connectToDatabase() {
+	if (!client) {
+		client = new MongoClient(process.env.DB_URL, { useUnifiedTopology: true });
+		await client.connect();
+		db = client.db(process.env.DB_NAME);
+	}
+	return { client, db };
 }
+
+const getLatestManga = async () => {
+	try {
+		const { db } = await connectToDatabase();
+		const collection = db.collection(process.env.MANGA_COLLECTION);
+
+		// Fetch the 30 latest manga from the database, sorting by latest_update (date and time)
+		const latestManga = await collection.aggregate([
+			{ $addFields: { 
+				latest_update_date: { $toDate: "$latest_update" } 
+			}},
+			{ $sort: { latest_update_date: -1 } },
+			{ $limit: 30 },
+			{
+				$project: {
+					"chapters.image_urls": 0,
+					"chapters.url": 0,
+					latest_update_date: 0
+				}
+			}
+		]).toArray();
+
+		return latestManga;
+	} catch (error) {
+		console.error('Error in getLatestManga:', error);
+		throw error;
+	}
+};
 
 module.exports = { getLatestManga }; // Export the function as part of an object
