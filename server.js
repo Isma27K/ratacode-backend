@@ -20,6 +20,11 @@ const searchRouter = require('./routes/search/search');
 // Enable CORS
 app.use(cors());
 
+app.use((req, res, next) => {
+    //console.log(`Received ${req.method} request for ${req.url}`);
+    next();
+});
+
 // Serve static assets if in production
 if (process.env.NODE_ENV === 'production') {
     app.use(express.static(path.join(__dirname, 'client/build')));

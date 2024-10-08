@@ -42,12 +42,15 @@ const getChapterImages = async (mangaId, chapterId) => {
 
 
 router.get('/getManga', async (req, res) => {
+    console.log('GET /getManga route accessed');
     try {
+        //console.log('Calling getLatestManga function');
         const latestManga = await getLatestManga();
+        //console.log(`Retrieved ${latestManga.length} manga`);
         res.status(200).json(latestManga);
     } catch (error) {
         console.error('Error in getManga route:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ error: 'Internal server error', message: error.message });
     }
 });
 
@@ -55,6 +58,7 @@ router.get('/getManga', async (req, res) => {
 
 router.get('/:mangaId/:chapterId?', async (req, res) => {
     const { mangaId, chapterId } = req.params;
+    //console.log('Requested mangaId:', mangaId);
 
     if (chapterId) {
         const imageUrls = await getChapterImages(mangaId, chapterId);
@@ -100,8 +104,11 @@ router.get('/:mangaId/:chapterId?', async (req, res) => {
         res.write(']');
         res.end();
     } else {
-        const mangaInfo = await getMangaInfo(mangaId);  // Use mangaId directly, no need to parse
+        //console.log('Fetching manga info for id:', mangaId);
+        const mangaInfo = await getMangaInfo(mangaId);
+        //console.log('Retrieved mangaInfo:', mangaInfo);
         if (!mangaInfo) {
+            //console.log('Manga not found in database');
             return res.status(404).send('Manga not found');
         }
         res.json(mangaInfo);
