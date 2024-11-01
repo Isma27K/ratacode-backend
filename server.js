@@ -11,6 +11,7 @@ const app = express();
 const { searchById, autocompleteSearch } = require('./database/getMangaInfo');
 const getManga = require('./routes/get-manga/getManga');
 const searchRouter = require('./routes/search/search');
+const mangaRoutes = require('./routes/get-manga/getManga');
 
 // Connect to MongoDB
 //mongoose.connect(process.env.MONGODB_URI)
@@ -55,14 +56,26 @@ app.get('/proxy', async (req, res) => {
     }
 });
 
-// Root route
-app.get('/', (req, res) => {
-    res.json({ message: 'Hello World' });
-});
 
-// Use routes
+
+// ============================= Root route ==========================================
+app.get('/', (req, res) => {res.json({ message: 'Hello World' });});
 app.use('/data', getManga);
 app.use('/api/search', searchRouter);
+app.use('/api/manga', mangaRoutes);
+
+// ============================= End of Root route ==================================
+
+
+
+
+
+
+
+
+
+
+
 
 // Catch-all route for production
 if (process.env.NODE_ENV === 'production') {

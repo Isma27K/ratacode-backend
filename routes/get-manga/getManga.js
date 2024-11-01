@@ -4,6 +4,7 @@ const axios = require('axios'); // Add this line to import axios
 const { searchById } = require('../../database/getMangaInfo');
 const { getLatestManga } = require('../../database/getRandomData');
 const { chapterImage } = require('../../database/getChapterImage');
+const { PassThrough } = require('stream');
 
 const getRandomManga = async () => {
     return await getRandomData();
@@ -39,21 +40,58 @@ const getChapterImages = async (mangaId, chapterId) => {
 
 
 // ================== ROUTES ==================
+// Add this route to handle proxied image requests
+router.get('/proxy-image', async (req, res) => {
+    const imageUrl = req.query.url;    
+    if (!imageUrl) {
+        return res.status(400).send('No image URL provided');
+    }
 
-
-router.get('/getManga', async (req, res) => {
-    console.log('GET /getManga route accessed');
     try {
-        //console.log('Calling getLatestManga function');
-        const latestManga = await getLatestManga();
-        //console.log(`Retrieved ${latestManga.length} manga`);
-        res.status(200).json(latestManga);
+        const response = await axios.get(imageUrl, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Referer': 'https://manganato.com/'
+            },
+            responseType: 'stream',
+            timeout: 10000
+        });        
+
+        // Forward the content type
+        res.setHeader('Content-Type', response.headers['content-type']);
+        
+        // Pipe the image stream directly to the response
+        response.data.pipe(res);
     } catch (error) {
-        console.error('Error in getManga route:', error);
-        res.status(500).json({ error: 'Internal server error', message: error.message });
+        res.status(500).send(`Failed to load image: ${error.message}`);
     }
 });
 
+
+router.get('/getManga/:page?', async (req, res) => {
+    try {
+        const page = parseInt(req.params.page) || 1;
+        const mangaData = await getLatestManga(page);
+        
+        // Check if there's an error in the pagination
+        if (mangaData.pagination.error) {
+            return res.status(400).json(mangaData);
+        }
+        
+        res.status(200).json(mangaData);
+    } catch (error) {
+        res.status(500).json({ 
+            manga: [],
+            pagination: {
+                currentPage: 1,
+                totalPages: 0,
+                totalItems: 0,
+                itemsPerPage: 20,
+                error: 'Server error occurred'
+            }
+        });
+    }
+});
 
 
 router.get('/:mangaId/:chapterId?', async (req, res) => {
@@ -67,41 +105,44 @@ router.get('/:mangaId/:chapterId?', async (req, res) => {
             return res.status(404).send('Chapter not found');
         }
 
+        // Set up SSE headers
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+
         const headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
             'Referer': 'https://manganato.com/'
         };
 
-        res.setHeader('Content-Type', 'application/json');
-        res.setHeader('Transfer-Encoding', 'chunked');
-        res.write('[');
-
-        let isFirst = true;
-        for (const url of imageUrls) {
+        // Create a proxy server to handle image requests
+        for (let i = 0; i < imageUrls.length; i++) {
             try {
-                const imageResponse = await axios.get(url, {
+                const response = await axios.get(imageUrls[i], {
                     headers: headers,
-                    responseType: 'arraybuffer',
+                    responseType: 'stream',
                     timeout: 10000
                 });
 
-                const image = {
-                    contentType: imageResponse.headers['content-type'],
-                    data: imageResponse.data.toString('base64')
-                };
+                // Send the image URL and content type to the client
+                res.write(`data: ${JSON.stringify({
+                    index: i,
+                    url: imageUrls[i],
+                    contentType: response.headers['content-type']
+                })}\n\n`);
 
-                if (!isFirst) {
-                    res.write(',');
-                }
-                res.write(JSON.stringify(image));
-                // Remove res.flush() as it's not necessary
-                isFirst = false;
             } catch (error) {
-                console.error(`Failed to fetch image: ${url}`, error);
-                // Continue with the next image if one fails
+                console.error(`Failed to fetch image: ${imageUrls[i]}`, error);
+                // Notify client about the failed image
+                res.write(`data: ${JSON.stringify({
+                    index: i,
+                    error: 'Failed to load image'
+                })}\n\n`);
             }
         }
-        res.write(']');
+
+        // Send end event
+        res.write(`data: ${JSON.stringify({ end: true })}\n\n`);
         res.end();
     } else {
         //console.log('Fetching manga info for id:', mangaId);
@@ -114,5 +155,9 @@ router.get('/:mangaId/:chapterId?', async (req, res) => {
         res.json(mangaInfo);
     }
 });
+
+
+
+
 
 module.exports = router;
