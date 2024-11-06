@@ -18,6 +18,7 @@ const getMangaInfo = async (mangaId) => {
             if (mangaInfo.chapters) {
                 mangaInfo.chapters.forEach(chapter => {
                     delete chapter.image_urls;
+                    delete chapter.url;
                 });
             }
             return mangaInfo;
